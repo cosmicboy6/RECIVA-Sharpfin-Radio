@@ -12,6 +12,7 @@
 
 ## Inhaltsverzeichnis
 
+0. [Schnellstart mit dem Deployment-Paket](#0-schnellstart-mit-dem-deployment-paket)
 1. [Überblick / Architektur](#1-überblick--architektur)
 2. [Voraussetzungen](#2-voraussetzungen)
 3. [Docker-macvlan-Netzwerk anlegen](#3-docker-macvlan-netzwerk-anlegen)
@@ -27,6 +28,31 @@
 13. [Roadmap](#13-roadmap)
 14. [Credits](#14-credits)
 15. [Buy me a coffee](#15-buy-me-a-coffee)
+
+---
+
+## 0. Schnellstart mit dem Deployment-Paket
+
+Im Ordner `deploy/` liegt ein fertiges Docker-Compose-Paket. Es baut das Image,
+legt das macvlan-Netz an, patched die `server`-Binary mit dem verifizierten
+30er-Clamp und startet Patchserver + DNS-Proxy:
+
+```sh
+cd deploy
+cp .env.example .env
+# .env ausfüllen: PARENT_IFACE, IPs, RADIO_IP, DES_KEY, SERIAL ...
+
+./scripts/install.sh \
+  --server-dir /pfad/zu/RecivaServer \
+  --patch-file /pfad/zu/sharpfin-base_0.3_IPdio.patch
+
+./scripts/verify.sh
+```
+
+Enthalten sind **keine** Binaries und **keine** Geheimnisse – `RecivaServer/`,
+die IPdio-Patchdatei und `.env` sind gitignored. `install.sh` fasst das Radio
+nicht an; die Radio-Schritte stehen in [Abschnitt 7](#7-radio-einrichten-netzwerk-firmware-sharpfin-ep2).
+Einzelheiten und Rollback-Hinweise: [`deploy/README.md`](deploy/README.md).
 
 ---
 
