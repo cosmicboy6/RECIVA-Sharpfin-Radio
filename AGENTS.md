@@ -86,6 +86,27 @@ Platzhalter ersetzen.
 
 ## 4. Build-Schritte
 
+### 4.0 Deployment-Paket (bevorzugt)
+
+Im Repo liegt `deploy/` mit Compose, Dockerfile und Skripten. Das ist der
+kürzeste Weg und berührt das Radio nicht:
+
+```sh
+cd deploy
+cp .env.example .env
+# Pflichtfelder ausfüllen: PARENT_IFACE, IPs, RADIO_IP, DES_KEY, SERIAL
+./scripts/install.sh \
+  --server-dir /pfad/zu/RecivaServer \
+  --patch-file /pfad/zu/sharpfin-base_0.3_IPdio.patch
+./scripts/verify.sh
+```
+
+`install.sh` kopiert die zwei nicht im Repo enthaltenen Inputs an ihren
+Build-Platz, prüft die Patch-MD5, patched `RecivaServer/server` mit dem
+verifizierten 47-Byte-Snippet (Backup `.bak-noClamp`), legt das macvlan-Netz
+an und startet `docker compose up -d --build`. Danach nur passiv prüfen;
+Radio-Änderungen weiterhin nur nach Freigabe. Details: `deploy/README.md`.
+
 ### 4.1 macvlan-Netz
 
 ```sh
