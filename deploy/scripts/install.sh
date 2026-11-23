@@ -147,7 +147,7 @@ echo "Baue und starte Container ..."
 $COMPOSE up -d --build
 
 echo
-echo "Fertig. Jetzt pasiv pruefen:"
+echo "Fertig. Jetzt passiv pruefen:"
 echo "  ./scripts/verify.sh"
 echo
 echo "Danach am Radio: DNS dauerhaft auf $DNS_PROXY_IP stellen und per Power-Button neu starten."
