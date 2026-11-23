@@ -1,0 +1,34 @@
+services:
+  patchserver:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${IMAGE_NAME:-reciva-patchserver:local}
+    container_name: reciva-patchserver
+    restart: unless-stopped
+    networks:
+      reciva:
+        ipv4_address: ${PATCHSERVER_IP}
+    environment:
+      PATCHSERVER_IP: ${PATCHSERVER_IP}
+      UPSTREAM_DNS: ${UPSTREAM_DNS}
+      RADIO_IP: ${RADIO_IP}
+      DES_KEY: ${DES_KEY}
+      SERIAL: ${SERIAL}
+
+  dnsproxy:
+    image: ${IMAGE_NAME:-reciva-patchserver:local}
+    container_name: reciva-dnsproxy
+    restart: unless-stopped
+    networks:
+      reciva:
+        ipv4_address: ${DNS_PROXY_IP}
+    environment:
+      PATCHSERVER_IP: ${PATCHSERVER_IP}
+      UPSTREAM_DNS: ${UPSTREAM_DNS}
+    entrypoint: ["python3", "-u", "/opt/dnsproxy.py"]
+
+networks:
+  reciva:
+    name: ${RECIVA_NET}
+    external: true
