@@ -1,0 +1,8 @@
+.git
+.gitignore
+.env
+secrets.md.gpg
+*.tar.gz
+*.log
+README.md
+scripts/
