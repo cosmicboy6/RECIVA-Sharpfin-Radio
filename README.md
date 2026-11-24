@@ -728,7 +728,7 @@ Nützliche Seiten, die bei der Recherche geholfen haben:
 - https://github.com/philsmd/sharpfin – Sharpfin-Quellen (alter C++-Patchserver)
 - https://github.com/felixalacampagne/recivaportal – Protokoll-Notizen, `sread`
 - http://www.g3gg0.de/wordpress/reversing/reciva-encryption-on-reciva-barracuda/ – Reciva-Verschlüsselung
-- https://iradioforum.net/forum/index.php?topic=2968.0 (auch via Wayback) – dliw zum Patchserver
+- https://web.archive.org/web/20250107210502/https://iradioforum.net/forum/index.php?topic=2968.0 – dliw: „Some findings“ (Original-Forum ist jetzt Gambling-Spam, daher Archiv-Version)
 - https://leo.pfweb.eu/dl/JMCi1 – dliw-Tools (`sread`, `reciva_decrypt.py`)
 - https://www.radio-browser.info/ – RadioBrowser-API
 - https://www.home-assistant.io/integrations/radio_browser/ – HA-Integration
