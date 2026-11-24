@@ -23,6 +23,7 @@
 8. [Senderdaten: RadioBrowser-Import (auch via Home Assistant)](#8-senderdaten-radiobrowser-import-auch-via-home-assistant)
 9. [Pagination-Patch: 30 Sender pro Seite](#9-pagination-patch-30-sender-pro-seite)
 10. [Dynamische Menüs & Presets (Sharpfin = Quelle der Wahrheit)](#10-dynamische-menüs--presets-sharpfin--quelle-der-wahrheit)
+10a. [Caddy: HTTPS-Streams für den IPdio (HTTP-Relay)](#10a-caddy-https-streams-für-den-ipdio-http-relay)
 11. [Update, Backup & Rollback](#11-update-backup--rollback)
 12. [Fehlerbehebung](#12-fehlerbehebung)
 13. [Roadmap](#13-roadmap)
@@ -648,6 +649,125 @@ Weitere Firmware-Eigenheiten:
 
 ---
 
+## 10a. Caddy: HTTPS-Streams für den IPdio (HTTP-Relay)
+
+Der IPdio kann selbst **kein TLS**. Ein HTTPS-Stream muss deshalb außerhalb des
+Radios terminiert werden. Caddy übernimmt das: Er holt den Stream per HTTPS vom
+Upstream und liefert ihn dem Radio als reines HTTP aus. Das Radio startet also
+weiterhin nur eine HTTP-Anfrage – Caddy „wandelt" nicht die Anfrage des Radios,
+sondern die Antwort des Upstreams. Getestet mit Caddy 2.11.4 im LAN.
+
+### 10a.1 Caddy installieren / Port ergänzen
+
+Wenn Caddy bereits läuft, genügt es, den Port `8082` zu veröffentlichen und die
+Caddyfile aus 10a.2 zu ergänzen. Bestehende Container **nicht** blind ersetzen –
+Ports, Mounts, Netzwerk und Restart-Policy beibehalten.
+
+Für eine neue Installation z. B.:
+
+```sh
+docker run -d --name caddy \
+  --restart unless-stopped \
+  -p 80:80 -p 443:443 -p 8082:8082 \
+  -v /pfad/zu/Caddyfile:/etc/caddy/Caddyfile:ro \
+  -v caddy_data:/data \
+  -v caddy_config:/config \
+  caddy:2-alpine \
+  caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+```
+
+Danach prüfen und aktiv machen:
+
+```sh
+docker exec caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+docker exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+```
+
+### 10a.2 Caddyfile-Snippet
+
+```caddyfile
+:8082 {
+	@https path_regexp t ^/https/([^/]+)/(.*)$
+	handle @https {
+		uri strip_prefix /https/{http.regexp.t.1}
+		reverse_proxy {http.regexp.t.1} {
+			transport http {
+				tls
+			}
+			header_up Host {http.regexp.t.1}
+		}
+	}
+
+	@http path_regexp u ^/http/([^/]+)/(.*)$
+	handle @http {
+		uri strip_prefix /http/{http.regexp.u.1}
+		reverse_proxy {http.regexp.u.1} {
+			header_up Host {http.regexp.u.1}
+		}
+	}
+
+	handle {
+		respond 404
+	}
+}
+```
+
+Falls das Upstream-Zertifikat nicht verifiziert werden kann, im `transport http`
+des HTTPS-Blocks ergänzen:
+
+```caddyfile
+tls_insecure_skip_verify
+```
+
+Nur im Notfall verwenden – korrekte Zertifikate sind vorzuziehen.
+
+### 10a.3 Preset-URLs umschreiben
+
+Der Vorspann für HTTPS-Ziele ist:
+
+```text
+http://192.168.0.68:8082/https/
+```
+
+Regel:
+
+```text
+https://X  →  http://192.168.0.68:8082/https/X
+http://X   →  http://192.168.0.68:8082/http/X
+```
+
+Dabei ist `X = host[:port]/pfad?query`. Hat die URL keinen Pfad, ein `/` anhängen.
+
+Beispiele:
+
+```text
+https://dogglounge.com:8000/;?type=http
+→ http://192.168.0.68:8082/https/dogglounge.com:8000/;?type=http
+
+http://musik.schlagerparadies.de:30842/
+→ http://192.168.0.68:8082/http/musik.schlagerparadies.de:30842/
+```
+
+Diese URLs werden weiterhin **ausschließlich über die Sharpfin-UI** in die
+Presets eingetragen (siehe 10.2). Caddy schreibt keine `preset*.xml`.
+Der DNS-Proxy aus Abschnitt 6 ist hier nicht beteiligt, weil die IP direkt
+eingetragen wird.
+
+### 10a.4 Funktionstest
+
+```sh
+curl -I 'http://192.168.0.68:8082/https/dogglounge.com:8000/;?type=http'
+# HTTP/1.1 200 OK
+# Content-Type: audio/mpeg
+# Icy-Name: Dogglounge Deep House Radio
+```
+
+> **Sicherheit:** Der Endpunkt ist LAN-only und kann grundsätzlich beliebige,
+> aus dem Caddy-Netz erreichbare Hosts proxyen. Port `8082` nicht ins Internet
+> veröffentlichen.
+
+---
+
 ## 11. Update, Backup & Rollback
 
 Alle Änderungen an `stations/` **vorher sichern**:
@@ -689,7 +809,7 @@ docker cp ./sharpfin-base_0.3_IPdio.patch \
 | „Lade Senderliste" bleibt hängen, Reboot | Patchserver ohne 30er-Clamp liefert 51 kB am Stück → gepatchtes Binary einsetzen |
 | Unter „Musikrichtung" steht nur „Varied" | Radio hat neue `stations.xml` gecacht → **Power-Button**-Reboot |
 | Senderliste leer nach Reboot | Radio-DNS zeigt nicht auf `.242`; dauerhaft auf den Proxy stellen |
-| Externe Streams gehen nicht | Nur `http://` verwenden; HTTPS unterstützt die Firmware nicht |
+| Externe Streams gehen nicht | Direkt nur `http://`; HTTPS über den Caddy-Relay aus [10a](#10a-caddy-https-streams-für-den-ipdio-http-relay) |
 | MAC-Container vom NAS nicht erreichbar | Normal bei macvlan – von einem LAN-Gerät oder per `docker exec` testen |
 | Radio-Uhr falsch | NTP-Prozess prüfen: `docker logs reciva-patchserver`, UDP 123 frei? |
 | Preset spielt falschen Sender („Sandisc") | ID-Kollision / alte Minimal-XML → Preset über Sharpfin-UI neu speichern |
@@ -704,7 +824,7 @@ docker cp ./sharpfin-base_0.3_IPdio.patch \
       Component inkl. `HA_TOKEN`-basierter API-Anbindung). Die CSV-/M3U-
       Generatoren und Reciva-View-Builder dafür liegen bereits bereit.
 - [ ] Optional: automatische Aktualisierung der Senderlisten (z. B. wöchentlich).
-- [ ] Optional: HTTPS-Streams über einen lokalen Proxy (nur mit Firmware-Anpassung).
+- [x] HTTPS-Streams über einen lokalen Caddy-HTTP-Relay – siehe [10a](#10a-caddy-https-streams-für-den-ipdio-http-relay). Keine Firmware-Anpassung nötig.
 
 ---
 
