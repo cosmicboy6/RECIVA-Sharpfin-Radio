@@ -2,11 +2,14 @@
 
 **Ein lokaler Patchserver + DNS-Proxy für DNT IPdio / Reciva-Internetradios – damit die Geräte auch nach der Reciva-Abschaltung weiterhin Senderlisten, Menüs und Firmware-Updates bekommen.**
 
-> **Status (23.11.2026):** verifiziert auf einer DNT IPdio mit Sharpfin-Firmware.
+> **Status (24.11.2026):** verifiziert auf einer DNT IPdio mit Sharpfin-Firmware.
 > Länder und Musikrichtungen laden dynamisch aus lokalen XML-Views:
 > **48 Länder / 2.807 Sender + 64 Genres / 4.378 Sender = 7.185 Sender in 121 Views.**
 > Die Listen werden paginationweise (30 pro Seite) geladen; Länder- und
-> Genre-Pfad sind am Radio getestet.
+> Genre-Pfad sind am Radio getestet. Zusätzlich ist Preset 99 als
+> Home-Assistant-Template-Media-Player im Einsatz: RadioBrowser- und
+> Music-Assistant-Titel erscheinen als echter Sendername im Sharpfin-Preset
+> (siehe [10b](#10b-home-assistant-template-media-player--preset-99)).
 
 ---
 
@@ -24,6 +27,7 @@
 9. [Pagination-Patch: 30 Sender pro Seite](#9-pagination-patch-30-sender-pro-seite)
 10. [Dynamische Menüs & Presets (Sharpfin = Quelle der Wahrheit)](#10-dynamische-menüs--presets-sharpfin--quelle-der-wahrheit)
 10a. [Caddy: HTTPS-Streams für den IPdio (HTTP-Relay)](#10a-caddy-https-streams-für-den-ipdio-http-relay)
+10b. [Home Assistant Template-Media-Player → Preset 99](#10b-home-assistant-template-media-player--preset-99)
 11. [Update, Backup & Rollback](#11-update-backup--rollback)
 12. [Fehlerbehebung](#12-fehlerbehebung)
 13. [Roadmap](#13-roadmap)
@@ -794,6 +798,190 @@ curl -I 'http://192.168.0.68:8082/https/dogglounge.com:8000/;?type=http'
 
 ---
 
+## 10b. Home Assistant Template-Media-Player → Preset 99
+
+Seit 24.11.2026 ist Preset 99 zusätzlich über einen **Template-Media-Player**
+in Home Assistant erreichbar. Damit lassen sich Sender aus RadioBrowser oder
+aus Music Assistant in den Sharpfin-Preset 99 „pushen“. Verifiziert wurde der
+komplette Weg inklusive hörbarem Audio am Radio.
+
+> **Grundregel:** Auch dieser Weg schreibt niemals direkt `preset*.xml`.
+> Der einzige Schreiber bleibt die Sharpfin-Oberfläche, konkret
+> `Presets_edit.cgi?...&place=99&action=program`.
+
+> **YAML-Hinweis:** Alle folgenden Blöcke sind Auszüge. Sie müssen in die
+> bereits vorhandenen Top-Level-Blöcke `template:`, `rest_command:`,
+> `input_text:` und `rest:` der `configuration.yaml` **eingefügt** werden.
+> Keine doppelten Top-Level-Keys erzeugen und keinen neuen `script:`-Block
+> anlegen (in dieser Installation existiert bereits `script: !include
+> scripts.yaml`).
+
+### 10b.1 Warum ein Template-Player
+
+Der IPdio hat selbst keine HA-Integration. Stattdessen wird in der
+`configuration.yaml` ein Template-Entity angelegt:
+
+```yaml
+template:
+  - media_player:
+      - name: "IPdio Preset 99"
+        default_entity_id: media_player.ipdio_preset99
+        unique_id: ipdio_preset99
+        icon: mdi:radio
+        state: "idle"
+        optimistic: true          # HA nimmt Befehle sofort an
+        device_class: speaker
+        play_media:               # einzig unterstützter Befehl
+          - ...                   # Namen/URL auflösen (siehe unten)
+          - action: rest_command.ipdio_preset99_store
+          - delay: "00:00:01"
+          - action: rest_command.ipdio_preset99_play
+```
+
+Wichtig:
+
+- `optimistic: true` / `assumed_state: true`: Der HA-Status springt sofort auf
+  `playing`, **auch wenn das Radio gerade still ist**. HA ist hier kein
+  Wiedergabemonitor.
+- `supported_features: 512` = nur `PLAY_MEDIA`. Es gibt bewusst kein
+  `media_stop`; ein Stopp erfolgt am Radio oder über die Sharpfin-UI.
+- Der echte Sende-Start läuft über `rest_command.ipdio_preset99_play` →
+  `Presets_play.cgi?i=99`. Auto-Play ist in dieser Installation nach
+  ausdrücklicher Freigabe aktiv; in anderen Setup bitte erst freigeben.
+
+Die zwei REST-Commands sind denkbar einfach:
+
+```yaml
+rest_command:
+  ipdio_preset99_store:
+    url: >-
+      http://192.168.0.39/cgi-bin/Presets_edit.cgi?name={{ preset_name | urlencode }}
+      &url={{ preset_url | urlencode }}&place=99&action=program
+  ipdio_preset99_play:
+    url: "http://192.168.0.39/cgi-bin/Presets_play.cgi?i=99"
+```
+
+`preset_url` ist immer eine Caddy-Relay-URL aus [10a](#10a-caddy-https-streams-für-den-ipdio-http-relay):
+
+```text
+https://X  →  http://192.168.0.68:8082/https/X
+http://X   →  http://192.168.0.68:8082/http/X
+```
+
+### 10b.2 RadioBrowser-Sendertitel auflösen
+
+Es gibt mehrere Wege, einen Sendernamen zu bekommen. Alle münden im selben
+`preset_name`-Feld; die Priorität ist:
+
+1. **RadioBrowser direkt aus HA:** `media-source://radio_browser/<UUID>`
+   → Helper `input_text.ipdio_rb_uuid` → REST-Sensor
+   `sensor.ipdio_radiobrowser_name`.
+2. **Music Assistant:** MA ruft `play_media` mit `extra.metadata.title` auf.
+3. **MA-Radio mit `no name`:** MA legt Radiosender oft als
+   `builtin://radio/<URL>` an und schickt wörtlich `no name`. Dann wird die
+   Original-URL aus `state_attr('media_player.ipdio_preset_99',
+   'media_content_id')` geholt, in `input_text.ipdio_rb_stream_url`
+   geschrieben und über RadioBrowser `/json/stations/byurl` aufgelöst.
+4. **Fallback:** Host aus der Stream-URL (z. B. `192.168.0.50:8097`).
+
+Werte wie `''`, `none`, `unknown`, `unavailable`, `no name`, `no_name` und
+`n/a` werden als „kein Name" behandelt. Der Resultat-Name wird auf
+**40 Zeichen** gekürzt – das ist die Feldbreite des Sharpfin-Formulars.
+
+Die zugehörigen REST-Sensoren (Auszug):
+
+```yaml
+input_text:
+  ipdio_rb_uuid:
+    name: "IPdio RadioBrowser UUID"
+    max: 64
+    initial: "<STATION_UUID>"
+  ipdio_rb_stream_url:
+    name: "IPdio RadioBrowser Stream URL"
+    max: 255
+    initial: ""
+
+rest:
+  - resource_template: >-
+      https://de1.api.radio-browser.info/json/stations/byuuid/{{ states('input_text.ipdio_rb_uuid') }}
+    scan_interval: 3600
+    sensor:
+      - name: "IPdio RadioBrowser URL"
+        value_template: "{{ value_json[0].url_resolved or value_json[0].url }}"
+      - name: "IPdio RadioBrowser Name"
+        value_template: "{{ value_json[0].name }}"
+  - resource_template: >-
+      https://de1.api.radio-browser.info/json/stations/byurl?url={{ states('input_text.ipdio_rb_stream_url') | urlencode }}
+    scan_interval: 3600
+    sensor:
+      - name: "IPdio RadioBrowser Name by URL"
+        value_template: "{{ value_json[0].name if value_json | length > 0 else '' }}"
+```
+
+> **Falle:** Der Entity-ID des zweiten Sensors lautet
+> `sensor.ipdio_radiobrowser_name_by_url` (vom *Namen* abgeleitet), nicht
+> `sensor.ipdio_radiobrowser_byurl_name` (das ist nur die `unique_id`).
+
+Der Namens-Block im `play_media`-Ablauf entspricht vereinfacht:
+
+```jinja
+{% set bad = ['', 'none', 'unknown', 'unavailable', 'no name', 'no_name', 'n/a'] %}
+{% if media_content_id.startswith('media-source://radio_browser/') %}
+  {% set name = states('sensor.ipdio_radiobrowser_name') %}
+{% else %}
+  {% set title = '' %}
+  {% if extra is defined and extra is mapping %}
+    {% if extra.get('metadata') is mapping %}
+      {% set title = extra.get('metadata', {}).get('title') or '' %}
+    {% endif %}
+    {% if (title | string | trim | lower) in bad %}
+      {% set title = extra.get('title') or '' %}
+    {% endif %}
+  {% endif %}
+  {% if (title | string | trim | lower) not in bad %}
+    {% set name = title %}
+  {% elif states('sensor.ipdio_radiobrowser_name_by_url') | lower not in bad %}
+    {% set name = states('sensor.ipdio_radiobrowser_name_by_url') %}
+  {% else %}
+    {% set name = 'Host aus der URL' %}
+  {% endif %}
+{% endif %}
+{{ (name | replace('\n', ' ') | replace('\r', ' ') | trim)[:40] }}
+```
+
+Vor dem Store werden die Sensoren mit `homeassistant.update_entity`
+aktualisiert; ein kurzes `delay` sorgt dafür, dass der neue Wert auch im
+`preset_name` ankommt.
+
+### 10b.3 Music Assistant details
+
+`192.168.0.50:8097` ist der **Music-Assistant-Streamserver**. Er liefert nur
+Audio; die `/info`-Antwort enthält lediglich eine `server_id`. Der Sendername
+steckt nicht in der Stream-URL, sondern im `play_media`-Aufruf bzw. im
+RadioBrowser-API. Der MA-Player muss einmalig unter
+*Settings → Player Providers → Home Assistant Media Players* importiert werden.
+
+Live-verifizierte Beispiele:
+
+```text
+RadioBrowser (UUID)      → Epic Lounge - IBIZA CHILLOUT LOUNGE
+MA mit Metadaten         → Lane 8 Summer 2016 Mixtape
+MA mit "no name"         → 0R - CLASSICAL HOTEL LOUNGE - CLASSICAL
+```
+
+Zum Prüfen des Presets **niemals** `Presets_edit.cgi` ohne `name`/`url`
+aufrufen (das speichert ein leeres Preset), sondern lesend:
+
+```sh
+curl -s 'http://192.168.0.39/cgi-bin/radio_Presets_Manage.cgi?start=99&end=99&action=program'
+```
+
+Bekannte Eigenheiten: harmlose doppelte `unique_id`-Warnungen der
+REST-Sensoren im HA-Log und der fehlende `media_stop` des Template-Players.
+Beides beeinträchtigt den Preset-99-Weg nicht.
+
+---
+
 ## 11. Update, Backup & Rollback
 
 Alle Änderungen an `stations/` **vorher sichern**:
@@ -845,12 +1033,17 @@ docker cp ./sharpfin-base_0.3_IPdio.patch \
 
 ## 13. Roadmap
 
-- [ ] **Home-Assistant-Integration:** Der RadioBrowser-Import soll künftig
-      direkt aus HA heraus auslösbar sein (Service/Automation bzw. Custom
-      Component inkl. `HA_TOKEN`-basierter API-Anbindung). Die CSV-/M3U-
-      Generatoren und Reciva-View-Builder dafür liegen bereits bereit.
+- [ ] **Vollständige Home-Assistant-Integration:** Der RadioBrowser-Import soll
+      künftig direkt aus HA heraus auslösbar sein (Service/Automation bzw.
+      Custom Component inkl. `HA_TOKEN`-basierter API-Anbindung). Die CSV-/M3U-
+      Generatoren und Reciva-View-Builder dafür liegen bereits bereit. Diese
+      Integration ist **weiterhin nicht** Teil dieses Repos.
 - [ ] Optional: automatische Aktualisierung der Senderlisten (z. B. wöchentlich).
 - [x] HTTPS-Streams über einen lokalen Caddy-HTTP-Relay – siehe [10a](#10a-caddy-https-streams-für-den-ipdio-http-relay). Keine Firmware-Anpassung nötig.
+- [x] Preset-99-Push aus HA über einen Template-Media-Player, inklusive
+      RadioBrowser- und Music-Assistant-Sendertiteln – siehe
+      [10b](#10b-home-assistant-template-media-player--preset-99). Dies ist eine
+      HA-Konfiguration und keine eigene Custom Component.
 
 ---
 
@@ -863,8 +1056,12 @@ docker cp ./sharpfin-base_0.3_IPdio.patch \
 - **opencode – Big Pickle** – für Recherche, Reverse Engineering, Skripte,
   Deployments, Tests und diese Dokumentation.
 - **Home Assistant** und die RadioBrowser-Integration – Datenquelle und
-  Kontrollinstanz für die Senderimporte.
-- **RadioBrowser** – die offene Senderdatenbank (API & Community).
+  Kontrollinstanz für die Senderimporte sowie der Template-Media-Player für
+  Preset 99.
+- **Music Assistant** – liefert Metadaten (Sendertitel) und den lokalen
+  Streamserver auf Port `8097`.
+- **RadioBrowser** – die offene Senderdatenbank (API & Community), auch für die
+  Namensauflösung per UUID bzw. Stream-URL.
 
 Nützliche Seiten, die bei der Recherche geholfen haben:
 
@@ -878,6 +1075,7 @@ Nützliche Seiten, die bei der Recherche geholfen haben:
 - https://leo.pfweb.eu/dl/JMCi1 – dliw-Tools (`sread`, `reciva_decrypt.py`)
 - https://www.radio-browser.info/ – RadioBrowser-API
 - https://www.home-assistant.io/integrations/radio_browser/ – HA-Integration
+- https://music-assistant.io/ – Music Assistant (Metadaten & Streamserver)
 
 ---
 

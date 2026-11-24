@@ -20,9 +20,11 @@ Reciva ist abgeschaltet. Das Radio braucht weiterhin:
 4. **Senderdaten**: 48 Länder + 64 Genres aus RadioBrowser, dynamisch generiert,
    30 Details pro Paginierungsseite.
 
-Zielzustand (akzeptiert am 23.11.2026, DNT IPdio, `v257-a-865-a-162-c-002`):
-Radio zeigt unter `Sender → Länder` und `Sender → Musikrichtung` volle Listen,
-Scroll lädt nach, Wrap-around normal, kein Reboot, ~4,6 MB freier RAM.
+Zielzustand (akzeptiert am 23.11.2026, erweitert am 24.11.2026, DNT IPdio,
+`v257-a-865-a-162-c-002`): Radio zeigt unter `Sender → Länder` und
+`Sender → Musikrichtung` volle Listen, Scroll lädt nach, Wrap-around normal,
+kein Reboot, ~4,6 MB freier RAM. Preset 99 zusätzlich per HA-Template-Player
+mit RadioBrowser-/Music-Assistant-Titel befüllbar (siehe 7b).
 
 ---
 
@@ -64,6 +66,7 @@ Scroll lädt nach, Wrap-around normal, kein Reboot, ~4,6 MB freier RAM.
 | Stationen | 48 Länder / 2.807 Sender (IDs `100001–102807`) + 64 Genres / 4.378 Sender (IDs `2000001–2004378`) = 7.185, 121 Views |
 | Pagination | `count=30` → 30/30/30/10 Details bei `start=0/30/60/90` |
 | Radio-DNS | dauerhaft `192.168.0.242` |
+| Preset 99 | `media_player.ipdio_preset99`, Name aus RadioBrowser/MA, max. 40 Zeichen |
 
 Alle IPs sind Beispielwerte – vorher mit dem User abklären und `<...>`
 Platzhalter ersetzen.
@@ -287,6 +290,91 @@ Ende, normaler Wrap-around, kein Reboot.
 
 ---
 
+## 7b. HA-Template-Media-Player → Preset 99 (RadioBrowser/MA-Titel)
+
+Ziel: Sender aus Home Assistant/RadioBrowser oder Music Assistant in den
+Sharpfin-Preset 99 „pushen“. Auch hier ist **allein die Sharpfin-UI** der
+Schreiber; niemals `preset*.xml` direkt anfassen.
+
+**Harte Regeln**
+
+- Nur `Presets_edit.cgi?...&place=99&action=program` speichert. Ein Aufruf ohne
+  `name`/`url` erzeugt ein **leeres** Preset und ist kein Lese-Endpoint.
+- `Presets_play.cgi?i=99` startet echtes Audio → nur nach ausdrücklicher
+  Freigabe. Der Template-Player ist `optimistic`; HA `playing` beweist **keine**
+  Wiedergabe.
+- Kein `media_stop` im Template-Player (`supported_features: 512`). Stopp am
+  Radio oder in der Sharpfin-UI.
+
+**Entity-/Endpoint-Map**
+
+```text
+media_player.ipdio_preset99    Template-Player, unique_id ipdio_preset99
+rest_command.ipdio_preset99_store → /cgi-bin/Presets_edit.cgi?name=…&url=…&place=99&action=program
+rest_command.ipdio_preset99_play  → /cgi-bin/Presets_play.cgi?i=99
+input_text.ipdio_rb_uuid          RadioBrowser-UUID aus media-source://radio_browser/<UUID>
+input_text.ipdio_rb_stream_url    Original-URL aus builtin://radio/<URL>
+sensor.ipdio_radiobrowser_url     /json/stations/byuuid/<UUID> → url_resolved/url
+sensor.ipdio_radiobrowser_name    /json/stations/byuuid/<UUID> → name
+sensor.ipdio_radiobrowser_name_by_url  /json/stations/byurl?url=<URL> → name
+```
+
+**YAML-Merge (wichtig)**
+
+Auszüge in die **bereits vorhandenen** Top-Level-Blöcke `template:`,
+`rest_command:`, `input_text:` und `rest:` der `configuration.yaml` einfügen.
+Keine doppelten Top-Level-Keys. Keinen neuen `script:`-Block anlegen – es gibt
+bereits `script: !include scripts.yaml`.
+
+**Ablauf in `play_media`**
+
+1. RadioBrowser-URI: UUID in `input_text.ipdio_rb_uuid` schreiben, dann
+   `homeassistant.update_entity` für URL+Name-Sensor.
+2. Andere Quellen (bes. MA): `media_content_id` des MA-Entities
+   `media_player.ipdio_preset_99` prüfen; bei `builtin://radio/<URL>` die URL in
+   `input_text.ipdio_rb_stream_url` schreiben, ByURL-Sensor aktualisieren, kurz
+   warten.
+3. Name in dieser Reihenfolge: RadioBrowser-Name → `extra.metadata.title` →
+   `extra.title` → ByURL-Sensor → Host aus der URL.
+4. `bad`-Liste verwirft `''`, `none`, `unknown`, `unavailable`, `no name`,
+   `no_name`, `n/a`. Ergebnis auf **40 Zeichen** kürzen (Sharpfin-Feldbreite)
+   und Zeilenumbrüche entfernen.
+5. Stream-URL vor dem Store durch den Caddy-Relay leiten:
+   `https://X` → `http://192.168.0.68:8082/https/X`,
+   `http://X` → `http://192.168.0.68:8082/http/X`.
+   Pfadlose URLs brauchen ein trailing `/`.
+6. Store, `delay: "00:00:01"`, dann Play (Auto-Play nur nach Freigabe).
+
+**Fallstricke**
+
+- Der Relay auf Port `8082` bleibt **LAN-only** und wird nie veröffentlicht.
+- ByURL-Endpoint ist `/json/stations/byurl?url=<URL>`, **nicht** `search?url=…`.
+- Entity-ID lautet `sensor.ipdio_radiobrowser_name_by_url` (vom Namen
+  abgeleitet); `sensor.ipdio_radiobrowser_byurl_name` ist nur die `unique_id`.
+- `192.168.0.50:8097` ist der MA-Streamserver; `/info` liefert nur eine
+  `server_id` und keinen Sendernamen. Titel kommt aus MA-Metadaten oder
+  RadioBrowser.
+- MA-Player muss einmalig unter *Settings → Player Providers → Home Assistant
+  Media Players* importiert werden.
+
+**Verifikation**
+
+```sh
+# HA-Validierung (Developer Tools oder CLI)
+homeassistant.check_config
+homeassistant.reload_all
+
+# Nur lesend prüfen – NIEMALS Presets_edit.cgi ohne name/url aufrufen
+curl -s 'http://192.168.0.39/cgi-bin/radio_Presets_Manage.cgi?start=99&end=99&action=program'
+```
+
+Live-verifizierte Titel: `Epic Lounge - IBIZA CHILLOUT LOUNGE` (UUID),
+`Lane 8 Summer 2016 Mixtape` (MA-Metadaten),
+`0R - CLASSICAL HOTEL LOUNGE - CLASSICAL` (MA `no name` via ByURL). Harmlos:
+doppelte REST-`unique_id`-Warnungen im HA-Log und der fehlende `media_stop`.
+
+---
+
 ## 8. Fehler → Aktion (Kurzform)
 
 | Symptom | Aktion |
@@ -295,7 +383,9 @@ Ende, normaler Wrap-around, kein Reboot.
 | „Lade Senderliste" + Reboot | Binary-Patch fehlt → Abschnitt 4.4, Hash prüfen |
 | Nur „Varied" unter Musikrichtung | `stations.xml` gecacht → Power-Button-Reboot |
 | Senderliste leer | Radio-DNS ist nicht `.242` |
-| Stream spielt nicht | HTTPS-URL → durch HTTP ersetzen |
+| Stream spielt nicht | HTTPS-URL → Caddy-Relay `http://192.168.0.68:8082/https/…` (oder `/http/…`) |
+| Preset 99 zeigt `no name` | `input_text.ipdio_rb_stream_url` + ByURL-Sensor prüfen; Entity-ID `…name_by_url`, Endpoint `/json/stations/byurl?url=…` |
+| HA zeigt `playing`, Radio ist still | `optimistic`! Store/Play-CGI und echte Audioausgabe prüfen |
 | Preset spielt falschen Sender | ID-Kollision/alte Minimal-XML → über Sharpfin-UI neu speichern |
 | Radio-Crash-Loop | m3u zu groß → ≤50 Tracks, vor Upload löschen |
 | Uhr falsch | NTP-Prozess/UDP 123 prüfen |
@@ -317,7 +407,9 @@ zurückkopieren; danach Power-Reboot.
 [ ] Radio: Netz/Firmware/EP2 (Freigabe!)
 [ ] RadioBrowser-Import mit Backup + Power-Reboot
 [ ] Dynamische Menüs/Sharpfin-CGIs prüfen
+[ ] HA-Template-Player + RadioBrowser/MA-Titel (Freigabe für Auto-Play!)
 [ ] Radio-Endtest (Freigabe!, User navigiert)
 ```
 
-Offen: HA-Integration für den Import (Roadmap, noch nicht gebaut).
+Offen: vollständige HA-Integration für den Import (Roadmap, noch nicht gebaut).
+Der Template-Media-Player für Preset 99 ist dagegen umgesetzt und verifiziert.
