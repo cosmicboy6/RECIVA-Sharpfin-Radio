@@ -1,8 +1,5 @@
 .env
 secrets.md.gpg
-RecivaServer/
-files/
-*.bak
 *.tar.gz
 __pycache__/
 *.pyc

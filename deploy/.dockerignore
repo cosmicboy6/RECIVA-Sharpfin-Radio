@@ -5,4 +5,5 @@ secrets.md.gpg
 *.tar.gz
 *.log
 README.md
+THIRD_PARTY.md
 scripts/

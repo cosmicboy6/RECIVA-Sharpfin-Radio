@@ -47,16 +47,16 @@ cd deploy
 cp .env.example .env
 # .env ausfüllen: PARENT_IFACE, IPs, RADIO_IP, DES_KEY, SERIAL ...
 
-./scripts/install.sh \
-  --server-dir /pfad/zu/RecivaServer \
-  --patch-file /pfad/zu/sharpfin-base_0.3_IPdio.patch
-
+./scripts/install.sh
 ./scripts/verify.sh
 ```
 
-Enthalten sind **keine** Binaries und **keine** Geheimnisse – `RecivaServer/`,
-die IPdio-Patchdatei und `.env` sind gitignored. `install.sh` fasst das Radio
-nicht an; die Radio-Schritte stehen in [Abschnitt 7](#7-radio-einrichten-netzwerk-firmware-sharpfin-ep2).
+Enthalten sind die geprüften **Upstream-Artefakte** (`RecivaServer/` mit
+`server` + `server.bak-noClamp`, `files/sharpfin-base_0.3_IPdio.patch`, EP2 und
+Media-Server-Installer), aber **keine Geheimnisse**. Herkunft, Hashes und
+Lizenzhinweise: [`deploy/THIRD_PARTY.md`](deploy/THIRD_PARTY.md). `install.sh`
+fasst das Radio nicht an; die Radio-Schritte stehen in
+[Abschnitt 7](#7-radio-einrichten-netzwerk-firmware-sharpfin-ep2).
 Einzelheiten und Rollback-Hinweise: [`deploy/README.md`](deploy/README.md).
 
 ---
@@ -416,13 +416,16 @@ Dienste im Container:
 **Firmware-Patch für die DNT IPdio:** Der generische `sharpfin-base_0.3.patch`
 führt bei der IPdio nicht zum Ziel. Stattdessen die IPdio-Variante
 `sharpfin-base_0.3_IPdio.patch` (MD5 `043934970007ed0e83ad62ecb8d54b02`,
-204.896 B) verwenden. Das Original vorher sichern und die Datei als
-`/opt/RecivaServer/patches/base_0.3.patch` ablegen. Als Quelle für die
-IPdio-spezifischen Patches diente
-https://github.com/jisotalo/reciva-radio-patching:
+204.896 B) verwenden. Sie liegt jetzt unter
+[`deploy/files/sharpfin-base_0.3_IPdio.patch`](deploy/files/sharpfin-base_0.3_IPdio.patch);
+`./scripts/install.sh` legt sie automatisch an ihren Build-Platz. Das Original
+vorher sichern und die Datei als `/opt/RecivaServer/patches/base_0.3.patch`
+ablegen. Als Quelle für die IPdio-spezifischen Patches diente
+https://github.com/jisotalo/reciva-radio-patching (siehe
+[`THIRD_PARTY.md`](deploy/THIRD_PARTY.md)):
 
 ```sh
-docker cp ./sharpfin-base_0.3_IPdio.patch \
+docker cp deploy/files/sharpfin-base_0.3_IPdio.patch \
   reciva-patchserver:/opt/RecivaServer/patches/base_0.3.patch
 # Gegenprobe (liefert genau diese MD5):
 curl -s http://192.168.0.240/file/reciva-upgrade.tar.bz2 | md5sum
@@ -1009,7 +1012,7 @@ Weitere Backups dieser Installation:
 Nach Container-Neuerstellung Dateien zurückkopieren (Beispiel Patchdatei):
 
 ```sh
-docker cp ./sharpfin-base_0.3_IPdio.patch \
+docker cp deploy/files/sharpfin-base_0.3_IPdio.patch \
   reciva-patchserver:/opt/RecivaServer/patches/base_0.3.patch
 ```
 
@@ -1050,9 +1053,11 @@ docker cp ./sharpfin-base_0.3_IPdio.patch \
 ## 14. Credits
 
 - **Sharpfin** und die Community – für die Firmware-Patches, EP2 und die
-  Web-Oberfläche, ohne die das Radio nicht mehr nutzbar wäre.
+  Web-Oberfläche, ohne die das Radio nicht mehr nutzbar wäre. Deren
+  Originalartefakte liegen jetzt unter [`deploy/THIRD_PARTY.md`](deploy/THIRD_PARTY.md).
 - **dliw** – für den Patchserver, `sread`/Entschlüsselungs-Tools und die
-  Reverse-Engineering-Arbeiten an der Firmware.
+  Reverse-Engineering-Arbeiten an der Firmware. Auch dessen `server`-Binary ist
+  dort mit Prüfsummen dokumentiert.
 - **opencode – Big Pickle** – für Recherche, Reverse Engineering, Skripte,
   Deployments, Tests und diese Dokumentation.
 - **Home Assistant** und die RadioBrowser-Integration – Datenquelle und

@@ -9,11 +9,13 @@ ist, und startet genau zwei Container im macvlan-Netz:
 | `reciva-patchserver` | `192.168.0.240` | Portal, NTP, Install-Dateien, dynamische Menüs |
 | `reciva-dnsproxy` | `192.168.0.242` | Reciva-Domains umleiten, Rest forwarden |
 
-**Nicht enthalten** (absichtlich, gitignored): die Patchserver-Source
-`RecivaServer/` mit der `server`-Binary sowie
-`files/sharpfin-base_0.3_IPdio.patch`. Diese Dateien musst du selbst
-bereitstellen. Ebenso enthält das Paket keine echten Geheimnisse – nur
-`.env.example` mit Platzhaltern.
+**Enthalten:** die Upstream-Artefakte `RecivaServer/server`,
+`RecivaServer/server.bak-noClamp`, `files/sharpfin-base_0.3_IPdio.patch`,
+`sharpfin-ep2.install` sowie die Media-Server-Installer. Provenienz, Hashes und
+Lizenzhinweise stehen in [`THIRD_PARTY.md`](THIRD_PARTY.md).
+
+**Nicht enthalten:** echte Geheimnisse. `.env.example` hat nur Platzhalter;
+der DES-Key wird zur Laufzeit injiziert.
 
 ---
 
@@ -24,11 +26,12 @@ cd deploy
 cp .env.example .env
 # .env ausfüllen: PARENT_IFACE, IPs, DES_KEY, SERIAL, RADIO_IP ...
 
-./scripts/install.sh \
-  --server-dir /pfad/zu/RecivaServer \
-  --patch-file /pfad/zu/sharpfin-base_0.3_IPdio.patch
-
+./scripts/install.sh
 ./scripts/verify.sh
+
+# Optional mit eigenen Dateien:
+# ./scripts/install.sh --server-dir /pfad/zu/RecivaServer \
+#   --patch-file /pfad/zu/sharpfin-base_0.3_IPdio.patch
 ```
 
 Danach am Radio: DNS dauerhaft auf `DNS_PROXY_IP` setzen und per
@@ -87,11 +90,12 @@ deploy/
 ├── ntp_server.py
 ├── sync_sharpfin_menu.py
 ├── patch_server.py
+├── THIRD_PARTY.md               # Provenienz, Hashes, Lizenzhinweise
 ├── scripts/
 │   ├── install.sh
 │   └── verify.sh
-├── files/                       # gitignored, von dir befüllt
-└── RecivaServer/                # gitignored, von dir befüllt
+├── files/                       # Upstream-Artefakte (Patch, EP2, Media Server)
+└── RecivaServer/                # Upstream-Binary + server.bak-noClamp
 ```
 
 ---

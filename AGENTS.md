@@ -82,7 +82,8 @@ Platzhalter ersetzen.
   `killall sernum; /usr/bin/sernum --daemon; /tmp/sread -c 0000000000000000`
   (Null-Challenge → `462528ce4d91403f`). Firmware nutzt **DES** (IV
   `bde73266b946f3ab`), nicht AES.
-- [ ] Eigene Kopie des Patchserver-Pakets `RecivaServer/` besorgen.
+- [ ] Patchserver-Artefakte liegen unter `deploy/RecivaServer/` und `deploy/files/`
+      (Provenienz/Hashes: `deploy/THIRD_PARTY.md`).
 - [ ] Freigaben einholen: Server-Deployment, Radio-Tests, große Importe.
 
 ---
@@ -98,17 +99,16 @@ kürzeste Weg und berührt das Radio nicht:
 cd deploy
 cp .env.example .env
 # Pflichtfelder ausfüllen: PARENT_IFACE, IPs, RADIO_IP, DES_KEY, SERIAL
-./scripts/install.sh \
-  --server-dir /pfad/zu/RecivaServer \
-  --patch-file /pfad/zu/sharpfin-base_0.3_IPdio.patch
+./scripts/install.sh
 ./scripts/verify.sh
 ```
 
-`install.sh` kopiert die zwei nicht im Repo enthaltenen Inputs an ihren
-Build-Platz, prüft die Patch-MD5, patched `RecivaServer/server` mit dem
-verifizierten 47-Byte-Snippet (Backup `.bak-noClamp`), legt das macvlan-Netz
-an und startet `docker compose up -d --build`. Danach nur passiv prüfen;
-Radio-Änderungen weiterhin nur nach Freigabe. Details: `deploy/README.md`.
+`install.sh` nutzt die mitgelieferten `RecivaServer/`- und `files/`-Artefakte,
+prüft die Patch-MD5, patched `RecivaServer/server` mit dem verifizierten
+47-Byte-Snippet (Backup `.bak-noClamp`), legt das macvlan-Netz an und startet
+`docker compose up -d --build`. Danach nur passiv prüfen; Radio-Änderungen
+weiterhin nur nach Freigabe. Details: `deploy/README.md`,
+`deploy/THIRD_PARTY.md`.
 
 ### 4.1 macvlan-Netz
 
@@ -189,7 +189,7 @@ docker run -d --name reciva-dnsproxy --network reciva-net \
 ```
 
 IPdio-Patchdatei ablegen (Original sichern):
-`docker cp ./sharpfin-base_0.3_IPdio.patch reciva-patchserver:/opt/RecivaServer/patches/base_0.3.patch`
+`docker cp deploy/files/sharpfin-base_0.3_IPdio.patch reciva-patchserver:/opt/RecivaServer/patches/base_0.3.patch`
 MD5 der ausgelieferten Datei: `043934970007ed0e83ad62ecb8d54b02`.
 
 ### 4.6 Radio (nur mit Freigabe!)

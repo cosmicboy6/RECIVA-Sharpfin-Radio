@@ -20,8 +20,8 @@ Optionen:
   -p, --patch-file PATH   sharpfin-base_0.3_IPdio.patch.
   -h, --help              Hilfe anzeigen.
 
-Fehlen -s/-p, muessen RecivaServer/ und files/sharpfin-base_0.3_IPdio.patch
-bereits in diesem Ordner liegen. Beide sind gitignored.
+Fehlen -s/-p, werden die mitgelieferten RecivaServer/- und files/-Dateien
+verwendet (siehe THIRD_PARTY.md).
 EOF
 }
 
