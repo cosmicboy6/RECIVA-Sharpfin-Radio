@@ -231,6 +231,9 @@ Home Assistant auslöst. Nicht als vorhanden dokumentieren.
 
 ### 5.2 Import-Reihenfolge und Backups
 
+Vollständige kopierbare Variante: **[`UPDATE.md`](UPDATE.md)** mit
+`tools/update_stations.sh` und den Generatoren unter `tools/`.
+
 1. `cd /opt/RecivaServer && tar czf stations.bak-$(date +%Y%m%d-%H%M%S).tar.gz stations`
 2. Generatoren laufen lassen (M3U → Views + counts).
 3. `tar czf reciva_import.tar.gz stations` → in Container kopieren →

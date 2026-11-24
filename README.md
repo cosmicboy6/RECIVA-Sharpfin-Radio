@@ -10,6 +10,8 @@
 > Home-Assistant-Template-Media-Player im Einsatz: RadioBrowser- und
 > Music-Assistant-Titel erscheinen als echter Sendername im Sharpfin-Preset
 > (siehe [10b](#10b-home-assistant-template-media-player--preset-99)).
+>
+> **Manuelles Update der Senderlisten:** [UPDATE.md](UPDATE.md)
 
 ---
 
@@ -572,13 +574,21 @@ Radio-Pfade: `Sender → Länder → <Land>` und `Sender → Musikrichtung → <
 neu starten** – sonst zeigt das Menü noch den gecachten alten Stand (z. B. nur
 „Varied" unter Musikrichtung).
 
-### 8.4 Skripte
+### 8.4 Skripte und komplette Update-Anleitung
 
-Die Generator-Skripte liegen lokal (`build_radiobrowser_100.py`,
-`build_reciva_views_100.py`, `build_radiobrowser_genres.py`,
-`build_reciva_genres.py`) und können als Vorlage für eigene Importe dienen:
-API-Abfrage → M3U → Reciva-View → `tar` nach
-`/opt/RecivaServer/stations/` → Pagination prüfen → Radio neu starten.
+Die Generatoren liegen jetzt im Repo unter [`tools/`](tools/) und sind so
+umgebaut, dass sie nicht mehr auf `/tmp/opencode` fixed gepflegt sind. Die
+vollständige, kopierbare Schritt-für-Schritt-Anleitung steht in
+**[`UPDATE.md`](UPDATE.md)** – inklusive `tools/update_stations.sh`, Backup,
+Deploy, Verifikation und Rollback. Kurzform:
+
+```sh
+./tools/update_stations.sh            # nur Paket bauen
+./tools/update_stations.sh --apply    # bauen, backupen, deployen
+```
+
+Danach immer **Power-Button** am Radio, sonst bleibt die alte `stations.xml`
+im Menü-Cache hängen.
 
 ---
 
@@ -987,6 +997,7 @@ Beides beeinträchtigt den Preset-99-Weg nicht.
 
 ## 11. Update, Backup & Rollback
 
+Die vollständige manuelle Update-Prozedur steht in **[`UPDATE.md`](UPDATE.md)**.
 Alle Änderungen an `stations/` **vorher sichern**:
 
 ```sh
