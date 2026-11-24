@@ -12,6 +12,9 @@
 > (siehe [10b](#10b-home-assistant-template-media-player--preset-99)).
 >
 > **Manuelles Update der Senderlisten:** [UPDATE.md](UPDATE.md)
+>
+> **Anderes Radio:** DES-Key, Seriennummer, IPs und ggf. der Firmware-Patch
+> müssen neu geprüft werden – siehe [`AGENTS.md`](AGENTS.md) Abschnitt 0b.
 
 ---
 

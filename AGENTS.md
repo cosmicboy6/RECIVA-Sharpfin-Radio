@@ -28,6 +28,30 @@ mit RadioBrowser-/Music-Assistant-Titel befüllbar (siehe 7b).
 
 ---
 
+## 0b. Neues Radio – was zwingend ersetzt werden muss
+
+Der Ablauf ist reproduzierbar, aber **nicht geräteunabhängig**. Nur der
+DNT IPdio mit `v257-a-865-a-162-c-002` ist hier live verifiziert. Vor einem
+zweiten Radio mindestens Folgendes prüfen:
+
+| Element | Projekt | Bei neuem Radio |
+|---|---|---|
+| DES-Key | `<DES_KEY>` | **immer neu** mit dliw's `sread` auslesen; nie aus alter Config kopieren |
+| Seriennummer | `<SERIAL>` | neu auslesen (`sernum`), in `dynamic_menu` und `.env` übernehmen |
+| FTP/Telnet | `<PASSWORT>` | gerätebezogen, nicht aus der Doku übernehmen |
+| IPs | `192.168.0.240/.242/.39/.50/.68` | Beispielwerte; `.env`, Docker-Netze und alle `curl`-Kommandos anpassen |
+| Firmware-Patch | `sharpfin-base_0.3_IPdio.patch` | nur für die IPdio-Firmware. Anderes Modell → Patchdatei/Offset neu prüfen |
+| Firmware-Version | `v257-a-865-a-162-c-002` | abweichende Version → „Upgrade Firmware" nicht blind ausführen |
+| Sharpfin EP2 | Addon via `:8080` | gleicher Weg, aber nach dem Reboot erreichbar prüfen |
+| HA/Preset 99 | `media_player.ipdio_preset99` | optional, nicht Voraussetzung für Patchserver + Menüs |
+| Caddy-Relay | `192.168.0.68:8082` | nur nötig, falls HTTPS-Streams eingesetzt werden; LAN-only |
+
+**Reihenfolge für ein neues Radio:** erst Inputs aus Abschnitt 3 einsammeln,
+dann Server/DNS passiv testen, erst danach Radio-Schritte mit Freigabe. Wenn
+ein Schritt nicht passt: anhalten und User fragen, statt zu raten.
+
+---
+
 ## 1. Harte Regeln – nicht verhandelbar
 
 **Darfst du:**
@@ -43,7 +67,9 @@ mit RadioBrowser-/Music-Assistant-Titel befüllbar (siehe 7b).
   explizit freigegebene Tests erlaubt.
 - `menu_200014.xml` („Mein Podcast") verändern – bleibt Original-Platzhalter.
 - Geheimnisse committen: `<DES_KEY>`, `<SERIAL>`, `<PASSWORT>`, `<HA_TOKEN>`
-  bleiben Platzhalter. Keine Binaries, keine `secrets.md.gpg` ins Repo.
+  bleiben Platzhalter. Keine `secrets.md.gpg`, keine echten Tokens oder
+  Live-Konfigurationen ins Repo. Die geprüften Upstream-Binaries liegen
+  bewusst unter `deploy/` und sind in `deploy/THIRD_PARTY.md` dokumentiert.
 
 **Weitere Fixregeln:**
 - Radio-Neustarts immer über den **Power-Button** (Software-Reboot kann WiFi
@@ -75,6 +101,8 @@ Platzhalter ersetzen.
 
 ## 3. Inputs einsammeln (bevor irgendwas gebaut wird)
 
+- [ ] Radio-Modell + Firmware-Version erfasst; Abweichung von
+      „DNT IPdio / `v257-a-865-a-162-c-002`“ geklärt (siehe 0b).
 - [ ] LAN-Interface des Docker-Hosts (`<NIC>`), freie IPs, Gateway/Upstream-DNS.
 - [ ] Radio-IP, Seriennummer `<SERIAL>`, FTP/Telnet-Passwort `<PASSWORT>`.
 - [ ] **DES-Key `<DES_KEY>`** – gerätebezogen, nicht aus Doku übernehmen!
@@ -401,6 +429,7 @@ zurückkopieren; danach Power-Reboot.
 ## 9. Reihenfolge / Abhängigkeiten (Kurzcheckliste)
 
 ```
+[ ] Neues Radio: Modell/Firmware/Key/Serial geprüft (siehe 0b)
 [ ] Inputs + Freigaben
 [ ] macvlan-Netz
 [ ] Image (DES-Key, Skripte, IPdio-Patchdatei)
