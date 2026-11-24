@@ -689,8 +689,14 @@ docker exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
 :8082 {
 	@https path_regexp t ^/https/([^/]+)/(.*)$
 	handle @https {
+		map {http.regexp.t.1} {upstream_https} {
+			~^([^:]+:[0-9]+)$ $1
+			~^([^:]+)$ $1:443
+		}
 		uri strip_prefix /https/{http.regexp.t.1}
-		reverse_proxy {http.regexp.t.1} {
+		reverse_proxy {upstream_https} {
+			header_down Location "https://" "http://192.168.0.68:8082/https/"
+			header_down Location "^/" "http://192.168.0.68:8082/https/"
 			transport http {
 				tls
 			}
@@ -700,8 +706,15 @@ docker exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
 
 	@http path_regexp u ^/http/([^/]+)/(.*)$
 	handle @http {
+		map {http.regexp.u.1} {upstream_http} {
+			~^([^:]+:[0-9]+)$ $1
+			~^([^:]+)$ $1:80
+		}
 		uri strip_prefix /http/{http.regexp.u.1}
-		reverse_proxy {http.regexp.u.1} {
+		reverse_proxy {upstream_http} {
+			header_down Location "https://" "http://192.168.0.68:8082/https/"
+			header_down Location "http://" "http://192.168.0.68:8082/http/"
+			header_down Location "^/" "http://192.168.0.68:8082/http/"
 			header_up Host {http.regexp.u.1}
 		}
 	}
@@ -711,6 +724,14 @@ docker exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
 	}
 }
 ```
+
+Das `map` ergänzt fehlende Ports: HTTPS ohne Port → `443`, HTTP ohne Port → `80`.
+Ohne dieses `map` dialt Caddy auf Port `0` und liefert `502`.
+
+Die `header_down Location`-Regeln schreiben Redirects des Upstreams auf den
+eigenen Relay zurück. Das ist wichtig für RadioBrowser-URLs wie
+`https://stream.example.de/...`, die mit `302` auf einen anderen HTTPS-Host
+umleiten – der IPdio könnte dem Redirect sonst nicht folgen.
 
 Falls das Upstream-Zertifikat nicht verifiziert werden kann, im `transport http`
 des HTTPS-Blocks ergänzen:
@@ -736,7 +757,9 @@ https://X  →  http://192.168.0.68:8082/https/X
 http://X   →  http://192.168.0.68:8082/http/X
 ```
 
-Dabei ist `X = host[:port]/pfad?query`. Hat die URL keinen Pfad, ein `/` anhängen.
+Dabei ist `X = host[:port]/pfad?query`. Subdomains funktionieren ohne weitere
+Anpassung, z. B. `stream.domain.de`. **Wichtig:** Hat die URL keinen Pfad, muss
+ein `/` angehängt werden – sonst trifft die Route nicht zu (`404`).
 
 Beispiele:
 
@@ -746,6 +769,9 @@ https://dogglounge.com:8000/;?type=http
 
 http://musik.schlagerparadies.de:30842/
 → http://192.168.0.68:8082/http/musik.schlagerparadies.de:30842/
+
+https://stream.epic-lounge.com/ibiza-chillout-lounge?ref=radiobrowser
+→ http://192.168.0.68:8082/https/stream.epic-lounge.com/ibiza-chillout-lounge?ref=radiobrowser
 ```
 
 Diese URLs werden weiterhin **ausschließlich über die Sharpfin-UI** in die
