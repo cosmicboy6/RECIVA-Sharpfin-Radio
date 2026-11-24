@@ -412,7 +412,9 @@ Dienste im Container:
 führt bei der IPdio nicht zum Ziel. Stattdessen die IPdio-Variante
 `sharpfin-base_0.3_IPdio.patch` (MD5 `043934970007ed0e83ad62ecb8d54b02`,
 204.896 B) verwenden. Das Original vorher sichern und die Datei als
-`/opt/RecivaServer/patches/base_0.3.patch` ablegen:
+`/opt/RecivaServer/patches/base_0.3.patch` ablegen. Als Quelle für die
+IPdio-spezifischen Patches diente
+https://github.com/jisotalo/reciva-radio-patching:
 
 ```sh
 docker cp ./sharpfin-base_0.3_IPdio.patch \
@@ -722,7 +724,7 @@ Nützliche Seiten, die bei der Recherche geholfen haben:
 
 - https://www.sharpf.in/ – Sharpfin-Wiki (Firmware, Login, Menüs)
 - https://www.megapico.co.uk/sharpfin/ – Sharpfin-Downloads & m3u-Feeds
-- https://github.com/jisotalo/reciva-radio-patching – IPdio-spezifische Patches
+- https://github.com/jisotalo/reciva-radio-patching – IPdio-spezifische Patches (Grundlage für den Firmware-Pfad)
 - https://github.com/philsmd/sharpfin – Sharpfin-Quellen (alter C++-Patchserver)
 - https://github.com/felixalacampagne/recivaportal – Protokoll-Notizen, `sread`
 - http://www.g3gg0.de/wordpress/reversing/reciva-encryption-on-reciva-barracuda/ – Reciva-Verschlüsselung
