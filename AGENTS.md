@@ -26,6 +26,10 @@ Zielzustand (akzeptiert am 23.11.2026, erweitert am 24.11.2026, DNT IPdio,
 kein Reboot, ~4,6 MB freier RAM. Preset 99 zusätzlich per HA-Template-Player
 mit RadioBrowser-/Music-Assistant-Titel befüllbar (siehe 7b).
 
+Referenz-Host: **UGREEN NASync DXP4800 Plus** mit Docker/macvlan. Dort laufen
+Patchserver, DNS-Proxy, Caddy-Relay, Home Assistant, Music Assistant, Jellyfin
+und Portainer. Andere Linux-Docker-Hosts sind möglich, wenn macvlan nutzbar ist.
+
 ---
 
 ## 0b. Neues Radio – was zwingend ersetzt werden muss

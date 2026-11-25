@@ -15,6 +15,12 @@
 >
 > **Anderes Radio:** DES-Key, Seriennummer, IPs und ggf. der Firmware-Patch
 > müssen neu geprüft werden – siehe [`AGENTS.md`](AGENTS.md) Abschnitt 0b.
+>
+> **Hardware-Highlight:** Der komplette Stack – Patchserver, DNS-Proxy,
+> Home Assistant, Music Assistant, Jellyfin, Caddy und Portainer – läuft auf
+> einer [**UGREEN NASync DXP4800 Plus**](https://ai.ugreen.com/pages/4-bay-nas-home-storage-ugreen-dxp4800-plus).
+> Diese NAS ist die Referenzplattform dieser Anleitung; alle IP-Beispiele und
+> Pfade stammen aus dieser Installation.
 
 ---
 
@@ -99,7 +105,7 @@ reciva-patchserver (192.168.0.240)
 | DNS-Proxy | `192.168.0.242` | Reciva-Domains umleiten, Rest forwarden |
 | Gateway / Upstream-DNS | `192.168.0.1` | normales Internet |
 | Home Assistant | `192.168.0.50` | RadioBrowser-Integration (Datenquelle, siehe Abschnitt 8) |
-| Docker-Host / Portainer | `192.168.0.68:9000` | Container-Verwaltung |
+| Docker-Host / Portainer (UGREEN NASync DXP4800 Plus) | `192.168.0.68:9000` | Container-Verwaltung |
 
 > **Wichtig:** Die Radio-DNS dauerhaft auf den Proxy stellen. Die alte Empfehlung
 > „nach dem Patchen auf den Router zurückstellen" ist überholt – dann verschwindet
@@ -109,7 +115,7 @@ reciva-patchserver (192.168.0.240)
 
 ## 2. Voraussetzungen
 
-- Linux-Docker-Host (x86-64) mit nutzbarer macvlan-Unterstützung (hier: Synology NAS).
+- Linux-Docker-Host (x86-64) mit nutzbarer macvlan-Unterstützung – hier: **UGREEN NASync DXP4800 Plus**.
 - Ein freier IP-Bereich im LAN für macvlan-Container.
 - Eine eigene Kopie des Patchserver-Pakets `RecivaServer/` (Binary `server`,
   `www8080/`, `stations/`, `patches/`). Das Binary ist nicht Teil dieses Repos –
@@ -138,8 +144,8 @@ docker network create -d macvlan \
 ```
 
 `<NIC>` ist die physische Schnittstelle des Docker-Hosts (z. B. `eth0`, auf
-Synology ggf. `bond0` / `bridge0` – mit `ip link` ermitteln). Die IPs
-`.240` und `.242` müssen im LAN frei sein.
+der UGREEN NASync DXP4800 Plus ggf. `bond0` / `bridge0` – mit `ip link`
+ermitteln). Die IPs `.240` und `.242` müssen im LAN frei sein.
 
 ---
 
@@ -1041,7 +1047,7 @@ docker cp deploy/files/sharpfin-base_0.3_IPdio.patch \
 | Unter „Musikrichtung" steht nur „Varied" | Radio hat neue `stations.xml` gecacht → **Power-Button**-Reboot |
 | Senderliste leer nach Reboot | Radio-DNS zeigt nicht auf `.242`; dauerhaft auf den Proxy stellen |
 | Externe Streams gehen nicht | Direkt nur `http://`; HTTPS über den Caddy-Relay aus [10a](#10a-caddy-https-streams-für-den-ipdio-http-relay) |
-| MAC-Container vom NAS nicht erreichbar | Normal bei macvlan – von einem LAN-Gerät oder per `docker exec` testen |
+| MAC-Container vom UGREEN-Host nicht erreichbar | Normal bei macvlan – von einem LAN-Gerät oder per `docker exec` testen |
 | Radio-Uhr falsch | NTP-Prozess prüfen: `docker logs reciva-patchserver`, UDP 123 frei? |
 | Preset spielt falschen Sender („Sandisc") | ID-Kollision / alte Minimal-XML → Preset über Sharpfin-UI neu speichern |
 | Radio crash loop | Zu große m3u (≥~4000 Tracks / 560 kB) → ≤50 Tracks, vor Upload löschen |
@@ -1074,6 +1080,9 @@ docker cp deploy/files/sharpfin-base_0.3_IPdio.patch \
   dort mit Prüfsummen dokumentiert.
 - **opencode – Big Pickle** – für Recherche, Reverse Engineering, Skripte,
   Deployments, Tests und diese Dokumentation.
+- **UGREEN NASync DXP4800 Plus** – Referenz-Hardware dieser Installation:
+  Patchserver, DNS-Proxy, Home Assistant, Music Assistant, Jellyfin, Caddy
+  und Portainer laufen dort mit Docker/macvlan.
 - **Home Assistant** und die RadioBrowser-Integration – Datenquelle und
   Kontrollinstanz für die Senderimporte sowie der Template-Media-Player für
   Preset 99.
