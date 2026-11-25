@@ -230,6 +230,14 @@ MD5 der ausgelieferten Datei: `043934970007ed0e83ad62ecb8d54b02`.
 2. Power-Cycle, dann `Configure → Upgrade Firmware → YES` (Patch lädt von `.240`).
 3. Sharpfin **EP2 ist ein Addon**, nicht Firmware:
    UI → `Install → Install Addon` → `http://<PATCHSERVER-IP>:8080/sharpfin-ep2.install`.
+   **Stolperstein zuerst prüfen:** `df -k /` auf dem Radio. Hier waren nur
+   **396 KB frei**, der Webserver hing während der Installation. Nicht die
+   japanische Sprache war das Problem, sondern voller Flash: `rt73`-Radio
+   braucht keine `zd1211*-driver.o`, de/en war schon aktiv,
+   `reciva_font_japanese.o` war ungenutzt. Nach dem Entfernen: 760 KB frei.
+   Nur bei gleichem Treiber-/Sprachenstand nachmachen – Details README 7.3.1.
+   Falls danach CGI-Seiten leer bleiben (HTTP 200/0 B): Header in
+   `/opt/webserver/cgi-bin/` auf `Content-type: text/html` korrigieren.
 4. Optional Media Server 1.0 (UPnP-Fallback): `.../media-server-1.0.install`.
 
 ---

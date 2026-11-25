@@ -491,9 +491,25 @@ Danach das Radio einmal komplett vom Strom trennen und neu starten.
 ### 7.3 Sharpfin EP2 (Addon – nicht über „Upgrade Firmware"!)
 
 EP2 ist ein Addon für die Sharpfin-Weboberfläche, **keine Firmware**. Der
-Reciva-Weg meldet sonst „not enough space".
+Reciva-Weg `Configure → Upgrade Firmware` erwartet eine
+`reciva-upgrade.tar.bz2` und prüft den freien Flash; mit der EP2-Datei kam
+hier **„not enough space"**. Richtig ist `Install → Install Addon`.
 
-- Vorher ggf. Speicher freimachen (ungenutzte Kernelmodule entfernen):
+#### 7.3.1 Stolperstein: voller Flash / hängender Webserver
+
+Das war bei dieser Installation der eigentliche Stolperstein: Der Sharpfin-
+Webserver reagierte während der Addon-Installation zeitweise nicht bzw. die
+Seite blieb hängen. Ursache war **knapper Flash-Speicher**, nicht eine
+„kaputte japanische Sprache".
+
+Vorher per Telnet prüfen:
+
+```sh
+df -k /
+```
+
+Gemessen: `13312 KB` gesamt, `12916 KB` belegt, **nur 396 KB frei (97 %)**.
+Erst danach wurden drei nachweislich ungenutzte Module entfernt:
 
 ```sh
 mount / -orw,remount
@@ -503,7 +519,26 @@ rm -f /lib/modules/2.4.26-vrs1-bast2/zd1211b-driver.o \
 mount / -oro,remount
 ```
 
-- In der Sharpfin-UI: `Install → Install Addon` → URL:
+Warum genau diese Dateien?
+
+- `zd1211b-driver.o` / `zd1211-driver.o`: Das Radio nutzt **`rt73`** für WLAN,
+  keine ZD1211-USB-Sticks.
+- `reciva_font_japanese.o`: Die Anzeigesprachen waren bereits auf **de/en**
+  reduziert. Das Font-Modul war ein nicht verwendeter Rest im Flash – es wurde
+  also **keine aktive japanische Menüsprache** entfernt.
+
+Danach: **760 KB frei (94 %)**. Erst mit diesem Platz die Addon-URL aufrufen.
+Nach der EP2-Installation: **684 KB frei (95 %)**, Web-UI nach dem Reboot
+wieder erreichbar.
+
+> **Nicht blind kopieren:** Bei einem anderen Radio vorher `df -k /` und den
+> tatsächlichen WLAN-Treiber prüfen. Wenn dort `zd1211*` verwendet wird, diese
+> Treiber **nicht** löschen. Besteht kein Platzproblem, den Schritt ganz
+> überspringen.
+
+#### 7.3.2 Addon installieren
+
+In der Sharpfin-UI: `Install → Install Addon` → URL:
 
 ```
 http://192.168.0.240:8080/sharpfin-ep2.install
@@ -512,6 +547,16 @@ http://192.168.0.240:8080/sharpfin-ep2.install
 Nach Download/Readme auf *Click Here to Do the Install* klicken; das Radio
 rebootet automatisch. Installiert wurden u. a. `sharpfin-www_0.7`,
 `sharpfin-ftpd_0.1`, `sharpfin-lircd_0.1`.
+
+**Zweite Falle danach:** Wenn die Weboberfläche zwar antwortet, aber CGI-Seiten
+leer bleiben (HTTP 200, 0 B), hatten die EP2-CGIs falsche Header, z. B.
+`Content-type text/html` ohne Doppelpunkt. In `/opt/webserver/cgi-bin/` auf
+`Content-type: text/html` korrigieren (Root vorher `mount / -orw,remount`,
+danach wieder `-oro`). Das betraf u. a. `radio_Presets_Manage.cgi` und
+`radio_Stations_Manage.cgi`.
+
+Falls nach fehlgeschlagenen Boots das WLAN fehlt: **Power-Cycle**, kein
+Software-Reboot.
 
 **Optionaler Fallback:** Sharpfin Media Server 1.0
 (`http://192.168.0.240:8080/media-server-1.0.install`) stellt Sender über
@@ -1047,6 +1092,7 @@ docker cp deploy/files/sharpfin-base_0.3_IPdio.patch \
 | Unter „Musikrichtung" steht nur „Varied" | Radio hat neue `stations.xml` gecacht → **Power-Button**-Reboot |
 | Senderliste leer nach Reboot | Radio-DNS zeigt nicht auf `.242`; dauerhaft auf den Proxy stellen |
 | Externe Streams gehen nicht | Direkt nur `http://`; HTTPS über den Caddy-Relay aus [10a](#10a-caddy-https-streams-für-den-ipdio-http-relay) |
+| Webserver hängt bei Addon-Install / leere CGI-Seiten danach | Flash prüfen (`df -k /`); bei <~500 KB freiem Platz ungenutzte Module wie in [7.3.1](#731-stolperstein-voller-flash--hängender-webserver) entfernen. Bei HTTP 200/0 B die EP2-Header in `/opt/webserver/cgi-bin/` korrigieren |
 | MAC-Container vom UGREEN-Host nicht erreichbar | Normal bei macvlan – von einem LAN-Gerät oder per `docker exec` testen |
 | Radio-Uhr falsch | NTP-Prozess prüfen: `docker logs reciva-patchserver`, UDP 123 frei? |
 | Preset spielt falschen Sender („Sandisc") | ID-Kollision / alte Minimal-XML → Preset über Sharpfin-UI neu speichern |
