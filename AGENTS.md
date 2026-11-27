@@ -54,6 +54,22 @@ zweiten Radio mindestens Folgendes prüfen:
 dann Server/DNS passiv testen, erst danach Radio-Schritte mit Freigabe. Wenn
 ein Schritt nicht passt: anhalten und User fragen, statt zu raten.
 
+**Historie des verifizierten IPdio (vom User berichtet, nicht verallgemeinern):**
+
+1. Zuerst wurde ein **Sharpfin-Patch** aufgespielt, der **Telnet und den
+   Webserver aktivierte**.
+2. Danach kam ein **Update**.
+3. Danach wurde ein **MediaPlayer** (UPnP-Fallback, `media-server-1.0`) addiert.
+4. Um dafür Flash freizugeben, wurde der **ungenutzte japanische Font**
+   `reciva_font_japanese.o` entfernt. **Das war keine Entfernung der Sprache
+   „Japanisch" als UI-Funktion** – die Anzeigesprachen waren bereits de/en.
+5. Erst danach traten der Webserver-Hang bei vollem Flash und die leeren
+   CGI-Seiten auf (siehe 4.6 / README 7.3.1).
+
+Diese Reihenfolge ist gerätebezogen. Bei einem neuen Radio **nicht** blind
+nachmachen: erst echten Treiber (`rt73` vs. `zd1211*`), Sprachstand und `df -k /`
+prüfen.
+
 ---
 
 ## 1. Harte Regeln – nicht verhandelbar
