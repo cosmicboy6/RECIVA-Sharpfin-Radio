@@ -110,13 +110,63 @@ Platzhalter ersetzen.
 - [ ] LAN-Interface des Docker-Hosts (`<NIC>`), freie IPs, Gateway/Upstream-DNS.
 - [ ] Radio-IP, Seriennummer `<SERIAL>`, FTP/Telnet-Passwort `<PASSWORT>`.
 - [ ] **DES-Key `<DES_KEY>`** – gerätebezogen, nicht aus Doku übernehmen!
-  Mit dliw's `sread` auf dem Radio lesen:
+  Ablauf und Ausgabe von dliw's `sread` stehen in **Abschnitt 3b**:
   `killall sernum; /usr/bin/sernum --daemon; /tmp/sread -c 0000000000000000`
   (Null-Challenge → `462528ce4d91403f`). Firmware nutzt **DES** (IV
   `bde73266b946f3ab`), nicht AES.
 - [ ] Patchserver-Artefakte liegen unter `deploy/RecivaServer/` und `deploy/files/`
       (Provenienz/Hashes: `deploy/THIRD_PARTY.md`).
 - [ ] Freigaben einholen: Server-Deployment, Radio-Tests, große Importe.
+
+### 3b. DES-Key mit `sread` auslesen (generell, gerätebezogen)
+
+Der Key ist **pro Radio verschieden** und geheim. Er darf nie aus einer
+anderen Konfiguration kopiert oder ins Repo geschrieben werden.
+
+**Voraussetzungen**
+
+- Shell-Zugang auf dem Radio (Telnet, bei Sharpfin `admin` / `<PASSWORT>`).
+- `sread` ist eine **ARM-Binärdatei** (dliw, siehe Credits/THIRD_PARTY.md) und
+  muss auf das Radio kopiert werden, z. B. nach `/tmp/sread`.
+- Der `sernum`-Daemon muss laufen; er antwortet auf die lokalen Anfragen von
+  `sread`.
+
+**Ablauf auf dem Radio**
+
+```sh
+killall sernum
+/usr/bin/sernum --daemon
+/tmp/sread -c 0000000000000000
+```
+
+**Ausgabe interpretieren**
+
+`sread [-v] [-c challenge] [-h]` akzeptiert eine hexadezimale Challenge von
+maximal 8 Byte. Bei der Null-Challenge `0000000000000000` gibt es typischerweise:
+
+```text
+challenge response: 462528ce4d91403f   # Erwartungswert der Null-Challenge
+key: <8 Byte hex>                      # <DES_KEY> – der gesuchte Wert
+MAC key: <hex>                         # für dieses Setup nicht benötigt
+```
+
+- Die **Challenge Response** dient nur der Plausibilitätsprüfung. Weicht sie
+  ab, nicht weiterfahren, sondern den Ablauf/das Gerät prüfen.
+- Der Wert hinter `key:` ist der **8-Byte-DES-Key** (`<DES_KEY>`).
+- Die Firmware nutzt **DES-CBC** mit IV `bde73266b946f3ab`, **nicht AES**.
+  Die AES-Teile in `reciva_decrypt.py` betreffen andere Firmwares.
+- Optional kann `reciva_decrypt.py` (gleiche Quelle) zum Nachvollziehen von
+  Challenge/Session-Daten verwendet werden; die Konstanten `DES_iv` und die
+  Helfer für Session Request/Response sind dort vorbereitet.
+
+**Wohin der Key**
+
+- In die Patchserver-Konfiguration: `configure_gui.sh`, Feld „EKey"
+  (Xvfb-Koordinate `200,292`) und `.env` als `DES_KEY`.
+- Nie committen: `<DES_KEY>`, `<SERIAL>`, `<PASSWORT>`, `<HA_TOKEN>`.
+- Prüfen: Nach dem Setzen darf am Radio nicht „Kein Internet" erscheinen;
+  die Session muss zustande kommen. Andernfalls zuerst den Key erneut
+  auslesen, bevor andere Ursachen gesucht werden.
 
 ---
 
