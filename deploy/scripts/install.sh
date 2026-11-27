@@ -9,6 +9,7 @@ cd "$(dirname "$0")/.."
 
 SERVER_DIR=""
 PATCH_FILE=""
+MODEL="ipdio"
 
 usage() {
   cat <<'EOF'
@@ -17,7 +18,11 @@ Usage: ./scripts/install.sh [Optionen]
 Optionen:
   -s, --server-dir PATH   Quellordner mit dem Patchserver-Paket
                           (muss ./server enthalten).
-  -p, --patch-file PATH   sharpfin-base_0.3_IPdio.patch.
+  -p, --patch-file PATH   Patch-Datei (Standard: je nach Modell).
+  -m, --model MODEL       ipdio (Standard) oder ipduo/generic.
+                          ipdio  -> sharpfin-base_0.3_IPdio.patch
+                          ipduo  -> sharpfin-base_0.3_generic.patch
+                                    (= offizieller Sharpfin Base 0.3)
   -h, --help              Hilfe anzeigen.
 
 Fehlen -s/-p, werden die mitgelieferten RecivaServer/- und files/-Dateien
@@ -57,6 +62,11 @@ while [[ $# -gt 0 ]]; do
     -p|--patch-file)
       [[ $# -ge 2 ]] || die "$1 braucht einen Pfad"
       PATCH_FILE="$2"
+      shift 2
+      ;;
+    -m|--model)
+      [[ $# -ge 2 ]] || die "$1 braucht ein Modell"
+      MODEL="$2"
       shift 2
       ;;
     -h|--help)
@@ -112,20 +122,35 @@ elif [[ ! -d RecivaServer ]]; then
 fi
 [[ -f RecivaServer/server ]] || die "RecivaServer/server fehlt"
 
+case "$MODEL" in
+  ipdio)
+    default_patch="files/sharpfin-base_0.3_IPdio.patch"
+    expected_md5="043934970007ed0e83ad62ecb8d54b02"
+    ;;
+  ipduo|generic)
+    default_patch="files/sharpfin-base_0.3_generic.patch"
+    expected_md5="da6ffd368350f575dc5e706ee1727e4e"
+    ;;
+  *)
+    die "unbekanntes Modell: $MODEL (ipdio|ipduo|generic)"
+    ;;
+esac
+
 mkdir -p files
 if [[ -n "$PATCH_FILE" ]]; then
   [[ -f "$PATCH_FILE" ]] || die "Patch-Datei fehlt: $PATCH_FILE"
   cp -f "$PATCH_FILE" files/sharpfin-base_0.3_IPdio.patch
-elif [[ ! -f files/sharpfin-base_0.3_IPdio.patch ]]; then
-  die "files/sharpfin-base_0.3_IPdio.patch fehlt - mit --patch-file angeben"
+elif [[ ! -f "$default_patch" ]]; then
+  die "$default_patch fehlt - mit --patch-file angeben"
+else
+  cp -f "$default_patch" files/sharpfin-base_0.3_IPdio.patch
 fi
 
 patch_md5="$(md5_of files/sharpfin-base_0.3_IPdio.patch)"
-expected_md5="043934970007ed0e83ad62ecb8d54b02"
 if [[ "$patch_md5" != "$expected_md5" ]]; then
-  die "falsche IPdio-Patchdatei: MD5 $patch_md5 statt $expected_md5"
+  die "falsche Patchdatei fuer $MODEL: MD5 $patch_md5 statt $expected_md5"
 fi
-echo "IPdio-Patchdatei geprueft (MD5 $patch_md5)"
+echo "Patchdatei fuer $MODEL geprueft (MD5 $patch_md5)"
 
 python3 patch_server.py RecivaServer/server
 
